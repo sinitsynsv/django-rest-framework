@@ -1288,6 +1288,104 @@ class TestDurationField(FieldValues):
 
 # Choice types...
 
+class CallableChoices:
+
+    def __init__(self):
+        self.call_count = 0
+
+    def __call__(self):
+        self.call_count += 1
+        return [
+            ('poor', 'Poor quality'),
+            ('medium', 'Medium quality'),
+            ('good', 'Good quality'),
+        ]
+
+
+class TestChoiceFieldCallableChoices(FieldValues):
+    valid_inputs = {
+        'poor': 'poor',
+        'medium': 'medium',
+        'good': 'good',
+    }
+    invalid_inputs = {
+        'amazing': ['"amazing" is not a valid choice.']
+    }
+    outputs = {
+        'good': 'good',
+        '': '',
+        'amazing': 'amazing',
+    }
+    field = serializers.ChoiceField(choices=tuple())
+
+    def setup(self):
+        self.callable_choices = CallableChoices()
+        self.field.choices = self.callable_choices
+
+    def test_valid_inputs(self):
+        FieldValues.test_valid_inputs(self)
+        assert self.callable_choices.call_count == 3
+
+    def test_invalid_inputs(self):
+        FieldValues.test_invalid_inputs(self)
+        assert self.callable_choices.call_count == 1
+
+    def test_outputs(self):
+        FieldValues.test_outputs(self)
+        assert self.callable_choices.call_count == 2
+
+
+class MultipleCallableChoices:
+
+    def __init__(self):
+        self.call_count = 0
+
+    def __call__(self):
+        self.call_count += 1
+        return [
+            ('aircon', 'AirCon'),
+            ('manual', 'Manual drive'),
+            ('diesel', 'Diesel'),
+        ]
+
+
+class TestMultipleChoiceFieldCallableChoices(FieldValues):
+    """
+    Valid and invalid values for `MultipleChoiceField`.
+    """
+    valid_inputs = {
+        (): set(),
+        ('aircon',): set(['aircon']),
+        ('aircon', 'manual'): set(['aircon', 'manual']),
+    }
+    invalid_inputs = {
+        'abc': ['Expected a list of items but got type "str".'],
+        ('aircon', 'incorrect'): ['"incorrect" is not a valid choice.']
+    }
+    outputs = [
+        (['aircon', 'manual', 'incorrect'], set(['aircon', 'manual', 'incorrect']))
+    ]
+    field = serializers.MultipleChoiceField(
+        choices=tuple()
+    )
+
+    def setup(self):
+        self.callable_choices = MultipleCallableChoices()
+        self.field.choices = self.callable_choices
+
+    def test_valid_inputs(self):
+        FieldValues.test_valid_inputs(self)
+        assert self.callable_choices.call_count == 3
+
+    def test_invalid_inputs(self):
+        FieldValues.test_invalid_inputs(self)
+        assert self.callable_choices.call_count == 2
+
+    def test_outputs(self):
+        FieldValues.test_outputs(self)
+        assert self.callable_choices.call_count == 3
+
+
 class TestChoiceField(FieldValues):
     """
     Valid and invalid values for `ChoiceField`.

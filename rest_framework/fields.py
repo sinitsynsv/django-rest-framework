@@ -19,6 +19,7 @@ from django.core.validators import (
 )
 from django.forms import FilePathField as DjangoFilePathField
 from django.forms import ImageField as DjangoImageField
+from django.forms.fields import CallableChoiceIterator
 from django.utils import six, timezone
 from django.utils.dateparse import (
     parse_date, parse_datetime, parse_duration, parse_time
@@ -1313,21 +1314,35 @@ class ChoiceField(Field):
     html_cutoff_text = _('More than {count} items...')
 
     def __init__(self, choices, **kwargs):
-        self.grouped_choices = to_choices_dict(choices)
-        self.choices = flatten_choices_dict(self.grouped_choices)
+        self.choices = choices
         self.html_cutoff = kwargs.pop('html_cutoff', self.html_cutoff)
         self.html_cutoff_text = kwargs.pop('html_cutoff_text', self.html_cutoff_text)
-
-        # Map the string representation of choices to the underlying value.
-        # Allows us to deal with eg. integer choices while supporting either
-        # integer or string input, but still get the correct datatype out.
-        self.choice_strings_to_values = {
-            six.text_type(key): key for key in self.choices.keys()
-        }
 
         self.allow_blank = kwargs.pop('allow_blank', False)
 
         super(ChoiceField, self).__init__(**kwargs)
+
+    def _get_choice(self):
+        return flatten_choices_dict(self.grouped_choices)
+
+    def _set_choices(self, value):
+        if callable(value):
+            value = CallableChoiceIterator(value)
+        else:
+            value = list(value)
+        self._original_choices = value
+
+    choices = property(_get_choice, _set_choices)
+
+    @property
+    def grouped_choices(self):
+        return to_choices_dict(self._original_choices)
+
+    @property
+    def choice_strings_to_values(self):
+        return {
+            six.text_type(key): key for key in self.choices.keys()
+        }
 
     def to_internal_value(self, data):
         if data == '' and self.allow_blank:
